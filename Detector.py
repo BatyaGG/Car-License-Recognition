@@ -8,23 +8,21 @@ import pytesseract
 import PossibleChar
 from scratch import start
 
+
 PLATE_WIDTH_PADDING_FACTOR = 1.3
 PLATE_HEIGHT_PADDING_FACTOR = 1.5
-
 MAX_DIAG_SIZE_MULTIPLE_AWAY = 5.0
-
 MAX_CHANGE_IN_AREA = 0.5
-
 MAX_CHANGE_IN_WIDTH = 0.8
 MAX_CHANGE_IN_HEIGHT = 0.2
-
 MAX_ANGLE_BETWEEN_CHARS = 12.0
-
 MIN_NUMBER_OF_MATCHING_CHARS = 3
+GAUSSIAN_SMOOTH_FILTER_SIZE = (5, 5)
+ADAPTIVE_THRESH_BLOCK_SIZE = 19
+ADAPTIVE_THRESH_WEIGHT = 9
 
 
 class Detector(object):
-
     def __init__(self, resize_factor, gamma_factor):
         self.resize_factor = resize_factor
         self.gamma_factor = gamma_factor
@@ -33,26 +31,13 @@ class Detector(object):
     def process_frame(self, frame):
         self.frame = cv2.resize(frame, (0,0), fx=self.resize_factor, fy=self.resize_factor)
         self.frame = gamma_correction(self.frame, self.gamma_factor)
+        print self.frame.shape
         possible_plates = detect_plates(frame)
         possible_plates.sort(key=lambda possible_plate: possible_plate.shape[0] * possible_plate.shape[1], reverse=True)
-
-        for possible_plate in possible_plates:
-            cv2.imshow('image', possible_plate)
-            cv2.waitKey(0)
-
-        licPlate = possible_plates[0]
-
-        cv2.imshow('image', licPlate)
-        cv2.waitKey(0)
-        if licPlate is None:
-            print 'eto pipes'
-            return ''
-        dst = start(licPlate)
-        dst = start(dst)
-        im = Image.fromarray(dst)
-        # im.show()
-        text = pytesseract.image_to_string(im)
-        return text
+        lic_plate = possible_plates[0]
+        # dst = start(lic_plate)
+        # dst = start(dst)
+        return lic_plate
 
 
 def gamma_correction(frame, power):
@@ -67,9 +52,9 @@ def detect_plates(img):
     possible_chars = find_possible_chars(img_thresh)
     list_of_lists_of_matching_chars_in_scene = find_list_of_lists_of_matching_chars(possible_chars)
     for listOfMatchingChars in list_of_lists_of_matching_chars_in_scene:
-        possiblePlate = extract_plate(img, listOfMatchingChars)
-        if possiblePlate is not None:
-            possible_plates.append(possiblePlate)
+        possible_plate = extract_plate(img, listOfMatchingChars)
+        if possible_plate is not None:
+            possible_plates.append(possible_plate)
     return possible_plates
 
 
@@ -169,9 +154,6 @@ def find_possible_chars(img_thresh):
 
 
 def preprocess(img):
-    GAUSSIAN_SMOOTH_FILTER_SIZE = (5, 5)
-    ADAPTIVE_THRESH_BLOCK_SIZE = 19
-    ADAPTIVE_THRESH_WEIGHT = 9
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img_contrast = maximize_contrast(img_gray)
     img_blur = cv2.GaussianBlur(img_contrast, GAUSSIAN_SMOOTH_FILTER_SIZE, 0)
@@ -188,19 +170,10 @@ def maximize_contrast(img_gray):
     return img_gray_plus_top_hat_minus_black_hat
 
 
-# def extractValue(imgOriginal):
-#     height, width, numChannels = imgOriginal.shape
-#
-#     imgHSV = np.zeros((height, width, 3), np.uint8)
-#
-#     imgHSV = cv2.cvtColor(imgOriginal, cv2.COLOR_BGR2HSV)
-#
-#     imgHue, imgSaturation, imgValue = cv2.split(imgHSV)
-#
-#     return imgValue
-
 if __name__ == '__main__':
-    detector = Detector(1, 2)
-    imgFile = cv2.imread('licence1.JPG')
-    print detector.process_frame(imgFile)
-
+    imgFile = cv2.imread('licence2.JPG')
+    print imgFile.shape
+    detector = Detector(0.01, 2)
+    plate = detector.process_frame(imgFile)
+    cv2.imshow('plate', plate)
+    cv2.waitKey(0)
