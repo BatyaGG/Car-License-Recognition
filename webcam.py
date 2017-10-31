@@ -1,6 +1,7 @@
 import cv2
 from threading import Thread
 
+
 class Webcam:
     def __init__(self):
         self.video_capture = cv2.VideoCapture(0)

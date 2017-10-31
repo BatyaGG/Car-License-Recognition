@@ -2,11 +2,9 @@ import math
 
 import numpy as np
 import cv2
-from PIL import Image
-import pytesseract
+
 
 import PossibleChar
-from scratch import start
 
 
 PLATE_WIDTH_PADDING_FACTOR = 1.3
@@ -23,20 +21,29 @@ ADAPTIVE_THRESH_WEIGHT = 9
 
 
 class Detector(object):
-    def __init__(self, resize_factor, gamma_factor):
+    def __init__(self, resize_factor=None, gamma_factor=None):
         self.resize_factor = resize_factor
         self.gamma_factor = gamma_factor
         self.frame = None
+        self.frame_gray = None
 
     def process_frame(self, frame):
-        self.frame = cv2.resize(frame, (0,0), fx=self.resize_factor, fy=self.resize_factor)
-        self.frame = gamma_correction(self.frame, self.gamma_factor)
-        print self.frame.shape
-        possible_plates = detect_plates(frame)
-        possible_plates.sort(key=lambda possible_plate: possible_plate.shape[0] * possible_plate.shape[1], reverse=True)
-        lic_plate = possible_plates[0]
-        # dst = start(lic_plate)
-        # dst = start(dst)
+        self.frame = frame
+        if self.resize_factor is None:
+            self.resize_factor = 300.0/frame.shape[1]
+        self.frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        self.frame_gray = cv2.resize(self.frame_gray, (0,0), fx=self.resize_factor, fy=self.resize_factor)
+        if self.gamma_factor is None:
+            self.gamma_factor = np.average(self.frame_gray) / 50
+        self.frame_gray = gamma_correction(self.frame_gray, self.gamma_factor)
+        possible_plates_characteristics = detect_plates(self.frame_gray, self.resize_factor)
+        possible_plates_characteristics.sort(key=lambda characteristic: characteristic[1] * characteristic[2], reverse=True)
+        try:
+            lic_characteristics = possible_plates_characteristics[0]
+        except:
+            return
+        img_original_rotated = cv2.warpAffine(self.frame, lic_characteristics[0], (self.frame.shape[1], self.frame.shape[0]))
+        lic_plate = cv2.getRectSubPix(img_original_rotated, (lic_characteristics[1], lic_characteristics[2]), tuple(lic_characteristics[3]))
         return lic_plate
 
 
@@ -46,43 +53,41 @@ def gamma_correction(frame, power):
     return np.uint8(frame * 255)
 
 
-def detect_plates(img):
-    possible_plates = []
-    img_gray, img_thresh = preprocess(img)
+def detect_plates(frame, resize_ratio):
+    possible_plates_characteristics = []
+    img_thresh = thresholding(frame)
     possible_chars = find_possible_chars(img_thresh)
     list_of_lists_of_matching_chars_in_scene = find_list_of_lists_of_matching_chars(possible_chars)
     for listOfMatchingChars in list_of_lists_of_matching_chars_in_scene:
-        possible_plate = extract_plate(img, listOfMatchingChars)
-        if possible_plate is not None:
-            possible_plates.append(possible_plate)
-    return possible_plates
+        plate_characteristics = extract_plate(listOfMatchingChars, resize_ratio)
+        if plate_characteristics[1] is not None:
+            possible_plates_characteristics.append(plate_characteristics)
+    return possible_plates_characteristics
 
 
-def extract_plate(img, list_of_matching_chars):
+def extract_plate(list_of_matching_chars, resize_ratio):
     list_of_matching_chars.sort(key = lambda current_matching_char: current_matching_char.intCenterX)
     flt_plate_center_x = (list_of_matching_chars[0].intCenterX +
                           list_of_matching_chars[len(list_of_matching_chars) - 1].intCenterX) / 2.0
     flt_plate_center_y = (list_of_matching_chars[0].intCenterY +
                           list_of_matching_chars[len(list_of_matching_chars) - 1].intCenterY) / 2.0
-    pt_plate_center = flt_plate_center_x, flt_plate_center_y
+    pt_plate_center_original = flt_plate_center_x / resize_ratio, flt_plate_center_y / resize_ratio
     int_plate_width = int((list_of_matching_chars[len(list_of_matching_chars) - 1].intBoundingRectX +
                           list_of_matching_chars[len(list_of_matching_chars) - 1].intBoundingRectWidth -
                           list_of_matching_chars[0].intBoundingRectX) * PLATE_WIDTH_PADDING_FACTOR)
+    int_plate_width_original = int(int_plate_width / resize_ratio)
     int_total_of_char_heights = 0
     for matching_char in list_of_matching_chars:
         int_total_of_char_heights += matching_char.intBoundingRectHeight
     flt_average_char_height = int_total_of_char_heights / len(list_of_matching_chars)
     int_plate_height = int(flt_average_char_height * PLATE_HEIGHT_PADDING_FACTOR)
+    int_plate_height_original = int(int_plate_height / resize_ratio)
     flt_opposite = list_of_matching_chars[len(list_of_matching_chars) - 1].intCenterY - list_of_matching_chars[0].intCenterY
     flt_hypotenuse = distance_between_chars(list_of_matching_chars[0], list_of_matching_chars[len(list_of_matching_chars) - 1])
     flt_correction_angle_in_rad = math.asin(flt_opposite / flt_hypotenuse)
     flt_correction_angle_in_deg = flt_correction_angle_in_rad * (180.0 / math.pi)
-    rotation_matrix = cv2.getRotationMatrix2D(tuple(pt_plate_center), flt_correction_angle_in_deg, 1.0)
-    height, width, numChannels = img.shape
-    img_rotated = cv2.warpAffine(img, rotation_matrix, (width, height))
-    img_cropped = cv2.getRectSubPix(img_rotated, (int_plate_width, int_plate_height), tuple(pt_plate_center))
-    possible_plate = img_cropped
-    return possible_plate
+    rotation_matrix_original = cv2.getRotationMatrix2D(tuple(pt_plate_center_original), flt_correction_angle_in_deg, 1.0)
+    return rotation_matrix_original, int_plate_width_original, int_plate_height_original, pt_plate_center_original
 
 
 def find_list_of_lists_of_matching_chars(possible_chars):
@@ -153,12 +158,11 @@ def find_possible_chars(img_thresh):
     return possible_chars
 
 
-def preprocess(img):
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+def thresholding(img_gray):
     img_contrast = maximize_contrast(img_gray)
     img_blur = cv2.GaussianBlur(img_contrast, GAUSSIAN_SMOOTH_FILTER_SIZE, 0)
     img_thresh = cv2.adaptiveThreshold(img_blur, 255.0, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, ADAPTIVE_THRESH_BLOCK_SIZE, ADAPTIVE_THRESH_WEIGHT)
-    return img_gray, img_thresh
+    return img_thresh
 
 
 def maximize_contrast(img_gray):
@@ -171,9 +175,11 @@ def maximize_contrast(img_gray):
 
 
 if __name__ == '__main__':
-    imgFile = cv2.imread('licence2.JPG')
-    print imgFile.shape
-    detector = Detector(0.01, 2)
+    imgFile = cv2.imread('licence2.jpg')
+    detector = Detector()
     plate = detector.process_frame(imgFile)
+    cv2.namedWindow('plate', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('plate', 600, 150)
     cv2.imshow('plate', plate)
+    cv2.imwrite('plate2.jpg', plate)
     cv2.waitKey(0)
