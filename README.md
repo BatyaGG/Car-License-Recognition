@@ -14,13 +14,43 @@ Other versions of the packages were not tested, but higher versions are welcome.
 
 # Usage
 
-Import local module classes.
+Import local module classes:
 
-'from Webcam import Webcam
+```
+from Webcam import Webcam
 from Detector import Detector
 from FrameToString import FrameToString'
+```
 
-Use main.py file as an example of how to use current implementation.
+Initiate them and declare global candidate string:
+
+```
+webcam = Webcam()
+detector = Detector()
+frameToString = FrameToString()
+current_license = ''
+```
+
+Create mainloop:
+
+```
+while True:
+    frame = webcam.get_current_frame()
+    plate = detector.process_frame(frame)
+```
+
+If candidate plate is detected, start scanning it using frameToString object:
+
+```
+    if plate is not None:
+        tesser_out = frameToString.process(plate)
+        if tesser_out is not None: current_license = tesser_out
+```
+
+With such pipeline, current_license string will have always most probable license characters.
+May be printed, but in my example I just draw it on frame itself.
+
+Use main.py file as an example.
 
 # License Plate Detection
 
