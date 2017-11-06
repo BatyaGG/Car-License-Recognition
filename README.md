@@ -1,6 +1,8 @@
 # Car-License-Recognition
 
-![alt text](https://github.com/BatyaGG/Car-License-Recognition/blob/master/recognized.JPG?raw=true)
+<p align="center"> 
+<img src="https://github.com/BatyaGG/Car-License-Recognition/blob/master/recognized.JPG?raw=true"/>
+</p>
 
 Car License recognition project implemented on Python using OpenCV and Tesseract. Code consists of 2 main modules: License Detection
 and License to String classes. OpenCV is mainly used to detect possible characters in a video stream frames and Tesseract is mainly used
