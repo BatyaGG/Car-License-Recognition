@@ -59,7 +59,7 @@ Use main.py file as an example.
 # License Plate Detection
 
 <p align="center"> 
-<img src="https://github.com/BatyaGG/Car-License-Recognition/blob/master/how_detector_works.JPG?raw=true" width = '50%'>
+<img src="https://github.com/BatyaGG/Car-License-Recognition/blob/master/how_detector_works.JPG?raw=true" width = '70%'>
 </p>
 
 Edges are detected using CannyEdge function from OpenCV. Frames are preprocessed beforehand using gaussian bluring to increase signal to noize ratio and adaptive thresholding of images to highlight characters in scene. All edges are stored in a list and their height to width ratios are found. If ratio is set to be 2:1, all edges of ratio close to 2:1 are considered as candidate characters. Only neighbouring candidate characters areas are considered as a candidate plate. All candidate plates are stored in a list and sorted by their area. Biggest possible plate is considered as License Plate and returned by the function.
