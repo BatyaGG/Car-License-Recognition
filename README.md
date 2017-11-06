@@ -71,3 +71,7 @@ License recognition works only for Kazakhstan plates. Since, tesseract-ocr was c
 # Optimization of performance in Plate Detector
 
 Video stream frames are resized to 200:300 shape, without any effects on accuracy of algorithm. Candidate plates are not cropped from frame each time they detected. Only center coordinates, width and height of them are stored in a list of tuples. Finally, the list is sorted by width X height parameter and the parameters having greatest area is chosen from the list. Parameters are rescaled to original size of frame and candidate plate is cropped from original frame only once and returned. This optimization increased performance of plate detection from 20 seconds to 0.2-0.5 seconds per frame.
+
+# Contribution
+
+I appreciate any contribution attempts to this project. Possible way to contribute is to change OCR from tesseract to another more robust method. One choice is to use Deep Learning techniques to classify characters. Contact me to b.saduanov@gmail.com for further discuss.
